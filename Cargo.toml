@@ -1,0 +1,14 @@
+[package]
+
+name = "rust-github"
+version = "0.0.1"
+authors = ["Jared Roesch <roeschinc@gmail.com>"]
+
+[lib]
+
+name = "github"
+
+[dependencies.hyper]
+
+name = "hyper"
+git = "https://github.com/hyperium/hyper"
