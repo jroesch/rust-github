@@ -1,7 +1,10 @@
 extern crate github;
+extern crate hyper;
 
 use github::notification::PushNotification;
 use github::server::{NotificationReceiver, NotificationListener};
+
+use self::hyper::{Ipv4Addr, Port};
 
 struct Temp;
 
@@ -12,6 +15,6 @@ impl NotificationReceiver for Temp {
 }
 
 fn main() {
-    NotificationListener::new(Temp).event_loop().unwrap();
+    NotificationListener::new(Ipv4Addr(127, 0, 0, 1), 1235, Temp).event_loop().unwrap();
     println!("SERVER READY");
 }

@@ -10,7 +10,7 @@ extern crate serialize;
 
 use self::hyper::{HttpResult, HttpError};
 use self::hyper::server::{Server, Incoming, Handler, Listening};
-use self::hyper::Ipv4Addr;
+use self::hyper::{IpAddr, Ipv4Addr, Port};
 use self::hyper::net::{HttpAcceptor, HttpStream};
 use self::hyper::uri::AbsolutePath;
 use self::hyper::method::Post;
@@ -87,9 +87,9 @@ impl Drop for ConnectionCloser {
 }
 
 impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
-    pub fn new(receiver: A) -> NotificationListener<'a, A> {
+    pub fn new(addr: IpAddr, port: Port, receiver: A) -> NotificationListener<'a, A> {
         NotificationListener {
-            server: Server::http(Ipv4Addr(127, 0, 0, 1), 1235),
+            server: Server::http(addr, port),
             receiver: NotificationReceiverWrapper { wrapped: receiver }
         }
     }
@@ -100,5 +100,39 @@ impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
                 listener: listener
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod testing {
+    extern crate hyper;
+    extern crate sync;
+
+    use self::hyper::{IpAddr, Ipv4Addr, Port};
+    use self::sync::{RWLock, Arc};
+
+    use super::{NotificationReceiver, NotificationListener};
+
+    use notification::PushNotification;
+
+    static ADDR: IpAddr = Ipv4Addr(127, 0, 0, 1);
+    static PORT: Port = 1235;
+
+    struct TestReceiver {
+        pushes: RWLock<Vec<PushNotification>>
+    }
+
+    impl NotificationReceiver for Arc<TestReceiver> {
+        fn receive_push_notification(&self, not: PushNotification) {
+            let mut lock = self.pushes.write();
+            lock.push(not);
+            lock.downgrade();
+        }
+    }
+
+    #[test]
+    fn server_starts() {
+        let recv = Arc::new(TestReceiver { pushes: RWLock::new(Vec::new()) });
+        NotificationListener::new(ADDR, PORT, recv.clone()).event_loop().unwrap();
     }
 }
