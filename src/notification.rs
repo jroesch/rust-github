@@ -12,11 +12,6 @@ pub struct PushNotification {
     branch: String
 }
 
-// TODO: There are many more kinds of notifications.
-pub enum Notification {
-    Push(PushNotification)
-}
-
 pub trait ToNotification {
     fn to_push_notification(&self) -> Result<PushNotification, &'static str>;
 }
