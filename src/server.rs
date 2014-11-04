@@ -8,8 +8,8 @@
 extern crate hyper;
 extern crate serialize;
 
-use self::hyper::HttpError;
-use self::hyper::server::{Server, Incoming, Handler};
+use self::hyper::{HttpResult, HttpError};
+use self::hyper::server::{Server, Incoming, Handler, Listening};
 use self::hyper::Ipv4Addr;
 use self::hyper::net::{HttpAcceptor, HttpStream};
 use self::hyper::uri::AbsolutePath;
@@ -76,6 +76,16 @@ pub struct NotificationListener<'a, A : NotificationReceiver + 'a> {
     receiver: NotificationReceiverWrapper<'a, A>
 }
 
+pub struct ConnectionCloser {
+    listener: Listening
+}
+
+impl Drop for ConnectionCloser {
+    fn drop(&mut self) {
+        self.listener.close();
+    }
+}
+
 impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
     pub fn new(receiver: A) -> NotificationListener<'a, A> {
         NotificationListener {
@@ -84,7 +94,11 @@ impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
         }
     }
 
-    pub fn event_loop(self) -> Result<(), HttpError>{
-        self.server.listen(self.receiver).map(|_| ())
+    pub fn event_loop(self) -> HttpResult<ConnectionCloser> {
+        self.server.listen(self.receiver).map(|listener| {
+            ConnectionCloser {
+                listener: listener
+            }
+        })
     }
 }
