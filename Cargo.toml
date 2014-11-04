@@ -1,6 +1,6 @@
 [package]
 
-name = "rust-github"
+name = "rust_github"
 version = "0.0.1"
 authors = ["Jared Roesch <roeschinc@gmail.com>"]
 
