@@ -117,4 +117,60 @@ mod tests {
                 branch: "gh-pages".to_string()
             }));
     }
+
+    #[test]
+    fn parse_invalid_push_missing_ref() {
+        let missing_ref = 
+            as_json("{\"repository\":\
+                    { \"clone_url\": \
+                    \"https://github.com/baxterthehacker/public-repo.git\" } }");
+        assert!(missing_ref.to_push_notification().is_err());
+    }
+
+    #[test]
+    fn parse_invalid_push_ref_nonstring() {
+        let invalid = 
+            as_json("{\"ref\": 5, \"repository\":\
+                    { \"clone_url\": \
+                    \"https://github.com/baxterthehacker/public-repo.git\" } }");
+        assert!(invalid.to_push_notification().is_err());
+    }
+
+    #[test]
+    fn parse_invalid_push_missing_repository() {
+        let invalid = 
+            as_json("{\"ref\": \"refs/heads/gh-pages\" }");
+        assert!(invalid.to_push_notification().is_err());
+    }
+
+    #[test]
+    fn parse_invalid_push_repository_nonobject() {
+        let invalid = 
+            as_json("{\"ref\": \"refs/heads/gh-pages\", \"repository\": 5 }");
+        assert!(invalid.to_push_notification().is_err());
+    }
+
+    #[test]
+    fn parse_invalid_push_missing_clone_url() {
+        let invalid = 
+            as_json("{\"ref\": \"refs/heads/gh-pages\", \"repository\": { } }");
+        assert!(invalid.to_push_notification().is_err());
+    }
+    
+    #[test]
+    fn parse_invalid_push_clone_url_nonstring() {
+        let invalid = 
+            as_json("{\"ref\": \"refs/heads/gh-pages\", \"repository\":\
+                    { \"clone_url\": 5 } }");
+        assert!(invalid.to_push_notification().is_err());
+    }
+
+    #[test]
+    fn parse_invalid_push_clone_url_nonurl() {
+        let invalid = 
+            as_json("{\"ref\": \"refs/heads/gh-pages\", \"repository\":\
+                    { \"clone_url\": \"blahbaz\" } }");
+        assert!(invalid.to_push_notification().is_err());
+    }
 }
+    
