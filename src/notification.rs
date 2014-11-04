@@ -8,8 +8,8 @@ use self::url::Url;
 // shown here.
 #[deriving(Show, PartialEq)]
 pub struct PushNotification {
-    clone_url: Url,
-    branch: String
+    pub clone_url: Url,
+    pub branch: String
 }
 
 pub trait ToNotification {

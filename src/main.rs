@@ -4,7 +4,7 @@ extern crate hyper;
 use github::notification::PushNotification;
 use github::server::{NotificationReceiver, NotificationListener};
 
-use self::hyper::{Ipv4Addr, Port};
+use self::hyper::Ipv4Addr;
 
 struct Temp;
 
