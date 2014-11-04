@@ -8,16 +8,17 @@
 extern crate hyper;
 extern crate serialize;
 
+use self::hyper::HttpError;
 use self::hyper::server::{Server, Incoming, Handler};
 use self::hyper::Ipv4Addr;
 use self::hyper::net::{HttpAcceptor, HttpStream};
 use self::hyper::uri::AbsolutePath;
 use self::hyper::method::Post;
-use self::serialize::json::{Json, from_reader};
+use self::serialize::json::from_reader;
 
 use notification::{ToNotification, PushNotification};
 
-trait NotificationReceiver : Send {
+pub trait NotificationReceiver : Send {
     fn receive_push_notification(&self, not: PushNotification);
 }
 
@@ -36,7 +37,7 @@ trait ToNotificationKind {
 impl ToNotificationKind for hyper::server::request::Request {
     fn get_kind(&self) -> Option<NotificationKind> {
         match (&self.method, &self.uri) {
-            (&Post, &AbsolutePath(ref path)) if path.as_slice() == "push_hook" => {
+            (&Post, &AbsolutePath(ref path)) if path.as_slice() == "/push_hook" => {
                 Some(Push)
             },
             _ => None
@@ -44,8 +45,8 @@ impl ToNotificationKind for hyper::server::request::Request {
     }
 }
 
-impl<'a, A: NotificationReceiver + 'a> Handler<HttpAcceptor, HttpStream>
-    for NotificationReceiverWrapper<'a, A> {
+impl<'a, A: NotificationReceiver + 'a> Handler<HttpAcceptor, HttpStream> for NotificationReceiverWrapper<'a, A> {
+    #[allow(unused_must_use)]
     fn handle(self, mut incoming: Incoming) {
         for (mut req, mut res) in incoming {
             let kind = req.get_kind();
@@ -62,24 +63,28 @@ impl<'a, A: NotificationReceiver + 'a> Handler<HttpAcceptor, HttpStream>
                     }
                 },
                 _ => ()
-            }
+            };
+
+            // needed to close the connection properly
+            res.start().and_then(|res| res.end());
         }
     }
 }
 
-struct NotificationListener<'a, A : NotificationReceiver + 'a> {
+pub struct NotificationListener<'a, A : NotificationReceiver + 'a> {
     server: Server,
-    receiver: A
+    receiver: NotificationReceiverWrapper<'a, A>
 }
 
 impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
-    fn new(receiver: A) -> NotificationListener<'a, A> {
+    pub fn new(receiver: A) -> NotificationListener<'a, A> {
         NotificationListener {
             server: Server::http(Ipv4Addr(127, 0, 0, 1), 1235),
-            receiver: receiver
+            receiver: NotificationReceiverWrapper { wrapped: receiver }
         }
     }
 
-//     fn event_loop(self) {
-//         self.listen(
+    pub fn event_loop(self) -> Result<(), HttpError>{
+        self.server.listen(self.receiver).map(|_| ())
+    }
 }
