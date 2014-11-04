@@ -12,3 +12,9 @@ name = "github"
 
 name = "hyper"
 git = "https://github.com/hyperium/hyper"
+
+[dependencies.url]
+
+name = "url"
+git = "https://github.com/servo/rust-url"
+
