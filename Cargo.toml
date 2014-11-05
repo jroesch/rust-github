@@ -11,7 +11,8 @@ name = "github"
 [dependencies.hyper]
 
 name = "hyper"
-git = "https://github.com/hyperium/hyper"
+git = "https://github.com/kyledewey/hyper"
+branch = "working"
 
 [dependencies.url]
 
