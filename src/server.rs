@@ -166,65 +166,114 @@ mod tests {
         assert!(recv.pushes.read().is_empty());
     }
 
-    fn push_notification_to_string(not: &PushNotification) -> String {
-        format!("{{ \"ref\": \"refs/head/{}\", \"repository\": {{ \"clone_url\": \"{}\" }} }}",
-                not.branch,
-                not.clone_url.to_string())
-    }
-
-    fn send_push_notification(not: &PushNotification, port: Port) {
+    fn send_to_server(what: &str, port: Port) {
         let fresh = Request::post(
             Url::parse(
                 format!("http://{}:{}/push_hook",
                         ADDR.to_string(),
                         port).as_slice()).unwrap()).unwrap();
         let mut streaming = fresh.start().unwrap();
-        streaming.write_str(push_notification_to_string(not).as_slice()).unwrap();
+        streaming.write_str(what).unwrap();
         streaming.send().unwrap().read_to_string().unwrap();
     }
-    
-    fn server_gets_valid_pushes(port: Port, nots: Vec<PushNotification>) {
+
+    enum Sendable<'a> {
+        SendPush(PushNotification),
+        SendString(&'a str)
+    }
+
+    impl<'a> ToString for Sendable<'a> {
+        fn to_string(&self) -> String {
+            match *self {
+                SendPush(ref push) => {
+                    format!("{{ \"ref\": \"refs/head/{}\", \"repository\": {{ \"clone_url\": \"{}\" }} }}",
+                            push.branch,
+                            push.clone_url.to_string())
+                }
+                SendString(s) => s.to_string()
+            }
+        }
+    }
+
+    fn extract_pushes<'a, 'b>(from: &'a Vec<&'b Sendable>) -> Vec<&'b PushNotification> {
+        let mut retval = Vec::new();
+        for sendable in from.iter() {
+            match sendable {
+                &&SendPush(ref not) => retval.push(not),
+                _ => ()
+            }
+        }
+
+        retval
+    }
+
+    fn send_multi_to_server(port: Port, what: &Vec<&Sendable>) {
         let recv = TestReceiver::new();
         let mut closer =
             NotificationListener::new(ADDR, port, recv.clone()).event_loop().unwrap();
 
-        for not in nots.iter() {
-            send_push_notification(not, port);
+        for each in what.iter() {
+            send_to_server(each.to_string().as_slice(), port);
         }
 
         closer.close();
 
-        let pushes = recv.pushes.read();
-        assert_eq!(pushes.len(), nots.len());
+        let expected_pushes = extract_pushes(what);
+        let actual_pushes = recv.pushes.read();
         
-        for (a, b) in nots.iter().zip(pushes.iter()) {
-            assert_eq!(a, b);
+        assert_eq!(expected_pushes.len(), actual_pushes.len());
+
+        for (a, b) in expected_pushes.iter().zip(actual_pushes.iter()) {
+            assert_eq!(a, &b);
         }
     }
 
     #[test]
     fn server_gets_valid_push_1() {
-        server_gets_valid_pushes(
-            1235u16,
-            vec!(
-                PushNotification {
-                    clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
-                    branch: "master".to_string()
-                }));
+        let p1 =
+            &SendPush(PushNotification {
+                clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
+                branch: "master".to_string()
+            });
+        send_multi_to_server(1235u16, &vec!(p1));
     }
 
     #[test]
     fn server_gets_valid_push_2() {
-        server_gets_valid_pushes(
-            1236u16,
-            vec!(
-                PushNotification {
-                    clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
-                    branch: "master".to_string()
-                },
-                PushNotification {
-                    clone_url: Url::parse("https://github.com/blahdeblah/coolbeans.git").unwrap(),
-                    branch: "experimental".to_string()
-                }));
+        let p1 =
+            &SendPush(PushNotification {
+                clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
+                branch: "master".to_string()
+            });
+        let p2 =
+            &SendPush(PushNotification {
+                clone_url: Url::parse("https://github.com/blahdeblah/coolbeans.git").unwrap(),
+                branch: "experimental".to_string()
+            });
+        send_multi_to_server(1236u16, &vec!(p1, p2));
+    }
+
+    #[test]
+    fn server_gets_invalid() {
+        let s = &SendString("some string");
+        send_multi_to_server(1237u16, &vec!(s));
+    }
+
+    #[test]
+    fn server_gets_invalid_valid() {
+        let v1 =
+            &SendPush(PushNotification {
+                clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
+                branch: "master".to_string()
+            });
+        let v2 =
+            &SendPush(PushNotification {
+                clone_url: Url::parse("https://github.com/blahdeblah/coolbeans.git").unwrap(),
+                branch: "experimental".to_string()
+            });
+        let s1 = &SendString("some string");
+        let s2 = &SendString("some other string");
+
+        send_multi_to_server(1238u16, &vec!(v1, s1, s2, v2));
     }
 }
