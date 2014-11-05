@@ -121,19 +121,60 @@ impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
 }
 
 #[cfg(test)]
+mod testing {
+    extern crate hyper;
+    extern crate url;
+
+    use self::hyper::{IpAddr, Port};
+    use self::hyper::client::Request;
+    use self::url::Url;
+
+    use notification::PushNotification;
+
+    pub fn send_to_server(what: &str, addr: IpAddr, port: Port) {
+        let fresh = Request::post(
+            Url::parse(
+                format!("http://{}:{}/push_hook",
+                        addr.to_string(),
+                        port).as_slice()).unwrap()).unwrap();
+        let mut streaming = fresh.start().unwrap();
+        streaming.write_str(what).unwrap();
+        streaming.send().unwrap().read_to_string().unwrap();
+    }
+
+    pub enum Sendable<'a> {
+        SendPush(PushNotification),
+        SendString(&'a str)
+    }
+
+    impl<'a> ToString for Sendable<'a> {
+        fn to_string(&self) -> String {
+            match *self {
+                SendPush(ref push) => {
+                    format!("{{ \"ref\": \"refs/head/{}\", \"repository\": {{ \"clone_url\": \"{}\" }} }}",
+                            push.branch,
+                            push.clone_url.to_string())
+                }
+                SendString(s) => s.to_string()
+            }
+        }
+    }
+}
+    
+#[cfg(test)]
 mod tests {
     extern crate hyper;
     extern crate sync;
     extern crate url;
 
     use self::hyper::{IpAddr, Ipv4Addr, Port};
-    use self::hyper::client::Request;
     use self::sync::{RWLock, Arc};
     use self::url::Url;
 
     use super::{NotificationReceiver, NotificationListener};
 
     use notification::PushNotification;
+    use super::testing::{send_to_server, Sendable, SendPush, SendString};
 
     static ADDR: IpAddr = Ipv4Addr(127, 0, 0, 1);
 
@@ -166,35 +207,6 @@ mod tests {
         assert!(recv.pushes.read().is_empty());
     }
 
-    fn send_to_server(what: &str, port: Port) {
-        let fresh = Request::post(
-            Url::parse(
-                format!("http://{}:{}/push_hook",
-                        ADDR.to_string(),
-                        port).as_slice()).unwrap()).unwrap();
-        let mut streaming = fresh.start().unwrap();
-        streaming.write_str(what).unwrap();
-        streaming.send().unwrap().read_to_string().unwrap();
-    }
-
-    enum Sendable<'a> {
-        SendPush(PushNotification),
-        SendString(&'a str)
-    }
-
-    impl<'a> ToString for Sendable<'a> {
-        fn to_string(&self) -> String {
-            match *self {
-                SendPush(ref push) => {
-                    format!("{{ \"ref\": \"refs/head/{}\", \"repository\": {{ \"clone_url\": \"{}\" }} }}",
-                            push.branch,
-                            push.clone_url.to_string())
-                }
-                SendString(s) => s.to_string()
-            }
-        }
-    }
-
     fn extract_pushes<'a, 'b>(from: &'a Vec<&'b Sendable>) -> Vec<&'b PushNotification> {
         let mut retval = Vec::new();
         for sendable in from.iter() {
@@ -213,7 +225,7 @@ mod tests {
             NotificationListener::new(ADDR, port, recv.clone()).event_loop().unwrap();
 
         for each in what.iter() {
-            send_to_server(each.to_string().as_slice(), port);
+            send_to_server(each.to_string().as_slice(), ADDR, port);
         }
 
         closer.close();
