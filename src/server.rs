@@ -120,7 +120,6 @@ impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
     }
 }
 
-#[cfg(test)]
 pub mod testing {
     extern crate hyper;
     extern crate url;
