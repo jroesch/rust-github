@@ -6,7 +6,7 @@ use self::url::Url;
 
 // TODO: there is much more information that what is
 // shown here.
-#[deriving(Show, PartialEq)]
+#[deriving(Show, PartialEq, Eq, Hash)]
 pub struct PushNotification {
     pub clone_url: Url,
     pub branch: String
