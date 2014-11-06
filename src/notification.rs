@@ -26,7 +26,7 @@ impl ToNotification for Json {
         let repo_obj = 
             try!(obj.find(&"repository".to_string()).ok_or("no 'repository' object"));
         let url_string = 
-            try!(try!(repo_obj.find(&"clone_url".to_string()).ok_or("no 'clone_url'"))
+            try!(try!(repo_obj.find("clone_url").ok_or("no 'clone_url'"))
                  .as_string().ok_or("'clone_url' is not a string"));
         let url = try!(Url::parse(url_string).map_err(|_| "'clone_url' is not valid"));
         Ok(PushNotification {
