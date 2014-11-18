@@ -38,7 +38,7 @@ impl ToNotificationKind for hyper::server::request::Request {
     fn get_kind(&self) -> Option<NotificationKind> {
         match (&self.method, &self.uri) {
             (&Post, &AbsolutePath(ref path)) if path.as_slice() == "/push_hook" => {
-                Some(Push)
+                Some(NotificationKind::Push)
             },
             _ => None
         }
@@ -48,10 +48,11 @@ impl ToNotificationKind for hyper::server::request::Request {
 impl<'a, A: NotificationReceiver + 'a> Handler<HttpAcceptor, HttpStream> for NotificationReceiverWrapper<'a, A> {
     #[allow(unused_must_use)]
     fn handle(self, mut incoming: Incoming) {
-        for (mut req, mut res) in incoming {
+        for conn in incoming {
+            let (mut req, res) = conn.open().unwrap();
             let kind = req.get_kind();
             match kind {
-                Some(Push) => {
+                Some(NotificationKind::Push) => {
                     match from_reader(&mut req) {
                         Ok(json) => {
                             match json.to_push_notification() {
@@ -127,6 +128,7 @@ pub mod testing {
     use self::hyper::{IpAddr, Port};
     use self::hyper::client::Request;
     use self::url::Url;
+    use self::Sendable::{SendPush, SendString};
 
     use notification::PushNotification;
 
@@ -173,7 +175,8 @@ mod tests {
     use super::{NotificationReceiver, NotificationListener};
 
     use notification::PushNotification;
-    use super::testing::{send_to_server, Sendable, SendPush, SendString};
+    use super::testing::{send_to_server, Sendable};
+    use super::testing::Sendable::{SendPush, SendString};
 
     static ADDR: IpAddr = Ipv4Addr(127, 0, 0, 1);
 
