@@ -20,11 +20,11 @@ impl ToNotification for Json {
     fn to_push_notification(&self) -> Result<PushNotification, &'static str> {
         let obj = try!(self.as_object().ok_or("malformed object"));
         let ref_line = 
-            try!(try!(obj.find(&"ref".to_string()).ok_or("no 'ref'"))
+            try!(try!(obj.get(&"ref".to_string()).ok_or("no 'ref'"))
                  .as_string().ok_or("'ref' is not a string"));
         let branch = try!(ref_line.split('/').last().ok_or("empty 'ref' line"));
         let repo_obj = 
-            try!(obj.find(&"repository".to_string()).ok_or("no 'repository' object"));
+            try!(obj.get(&"repository".to_string()).ok_or("no 'repository' object"));
         let url_string = 
             try!(try!(repo_obj.find("clone_url").ok_or("no 'clone_url'"))
                  .as_string().ok_or("'clone_url' is not a string"));
