@@ -126,17 +126,20 @@ pub mod testing {
 
     use self::hyper::{IpAddr, Port};
     use self::hyper::client::Request;
+    use self::hyper::header::common::connection::Connection;
+    use self::hyper::header::common::connection::ConnectionOption::Close;
     use self::url::Url;
     use self::Sendable::{SendPush, SendString};
 
     use notification::PushNotification;
 
     pub fn send_to_server(what: &str, addr: IpAddr, port: Port) {
-        let fresh = Request::post(
+        let mut fresh = Request::post(
             Url::parse(
                 format!("http://{}:{}/push_hook",
                         addr.to_string(),
                         port).as_slice()).unwrap()).unwrap();
+        fresh.headers_mut().set(Connection(vec!(Close)));
         let mut streaming = fresh.start().unwrap();
         streaming.write_str(what).unwrap();
         streaming.send().unwrap().read_to_string().unwrap();
@@ -239,7 +242,7 @@ mod tests {
             assert_eq!(a, &b);
         }
     }
-
+    
     #[test]
     fn server_gets_valid_push_1() {
         let p1 =
