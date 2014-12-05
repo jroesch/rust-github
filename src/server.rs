@@ -9,11 +9,13 @@ extern crate hyper;
 extern crate serialize;
 
 use self::hyper::HttpResult;
-use self::hyper::server::{Server, Incoming, Handler, Listening};
+use self::hyper::server::{Server, Handler, Listening};
+use self::hyper::server::request::Request;
+use self::hyper::server::response::Response;
 use self::hyper::{IpAddr, Port};
-use self::hyper::net::{HttpAcceptor, HttpStream};
-use self::hyper::uri::AbsolutePath;
-use self::hyper::method::Post;
+use self::hyper::net::Fresh;
+use self::hyper::uri::RequestUri::AbsolutePath;
+use self::hyper::method::Method::Post;
 use self::serialize::json::from_reader;
 
 use notification::{ToNotification, PushNotification};
@@ -34,7 +36,7 @@ trait ToNotificationKind {
     fn get_kind(&self) -> Option<NotificationKind>;
 }
 
-impl ToNotificationKind for hyper::server::request::Request {
+impl<'a> ToNotificationKind for hyper::server::request::Request<'a> {
     fn get_kind(&self) -> Option<NotificationKind> {
         match (&self.method, &self.uri) {
             (&Post, &AbsolutePath(ref path)) if path.as_slice() == "/push_hook" => {
@@ -45,30 +47,27 @@ impl ToNotificationKind for hyper::server::request::Request {
     }
 }
 
-impl<'a, A: NotificationReceiver + 'a> Handler<HttpAcceptor, HttpStream> for NotificationReceiverWrapper<'a, A> {
+impl<'a, A: NotificationReceiver + Sync + 'a> Handler for NotificationReceiverWrapper<'a, A> {
     #[allow(unused_must_use)]
-    fn handle(self, mut incoming: Incoming) {
-        for conn in incoming {
-            let (mut req, res) = conn.open().unwrap();
-            let kind = req.get_kind();
-            match kind {
-                Some(NotificationKind::Push) => {
-                    match from_reader(&mut req) {
-                        Ok(json) => {
-                            match json.to_push_notification() {
-                                Ok(not) => self.wrapped.receive_push_notification(not),
-                                _ => ()
-                            }
-                        },
-                        _ => ()
-                    }
-                },
-                _ => ()
-            };
-
-            // needed to close the connection properly
-            res.start().and_then(|res| res.end());
-        }
+    fn handle(&self, mut req: Request, res: Response<Fresh>) {
+        let kind = req.get_kind();
+        match kind {
+            Some(NotificationKind::Push) => {
+                match from_reader(&mut req) {
+                    Ok(json) => {
+                        match json.to_push_notification() {
+                            Ok(not) => self.wrapped.receive_push_notification(not),
+                            _ => ()
+                        }
+                    },
+                    _ => ()
+                }
+            },
+            _ => ()
+        };
+        
+        // needed to close the connection properly
+        res.start().and_then(|res| res.end());
     }
 }
 
@@ -106,7 +105,7 @@ impl Drop for ConnectionCloser {
     }
 }
 
-impl<'a, A : NotificationReceiver + 'a> NotificationListener<'a, A> {
+impl<'a, A : NotificationReceiver + Sync + 'a> NotificationListener<'a, A> {
     pub fn new(addr: IpAddr, port: Port, receiver: A) -> NotificationListener<'a, A> {
         NotificationListener {
             server: Server::http(addr, port),
@@ -165,11 +164,10 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     extern crate hyper;
-    extern crate sync;
     extern crate url;
 
+    use std::sync::{RWLock, Arc};
     use self::hyper::{IpAddr, Ipv4Addr, Port};
-    use self::sync::{RWLock, Arc};
     use self::url::Url;
 
     use super::{NotificationReceiver, NotificationListener};
