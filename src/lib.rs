@@ -2,7 +2,4 @@
 
 pub mod server;
 pub mod notification;
-
-#[test]
-fn it_works() {
-}
+pub mod clone_url;

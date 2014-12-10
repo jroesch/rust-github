@@ -1,14 +1,15 @@
 extern crate serialize;
 extern crate url;
 
-use self::serialize::json::Json;
+use clone_url::CloneUrl;
 use self::url::Url;
+use self::serialize::json::Json;
 
 // TODO: there is much more information that what is
-// shown here.
-#[deriving(Show, PartialEq, Eq, Hash)]
+// shown here.  This is just what is needed for Gradr.
+#[deriving(Show, PartialEq)]
 pub struct PushNotification {
-    pub clone_url: Url,
+    pub clone_url: CloneUrl,
     pub branch: String
 }
 
@@ -29,22 +30,28 @@ impl ToNotification for Json {
             try!(try!(repo_obj.find("clone_url").ok_or("no 'clone_url'"))
                  .as_string().ok_or("'clone_url' is not a string"));
         let url = try!(Url::parse(url_string).map_err(|_| "'clone_url' is not valid"));
-        Ok(PushNotification {
-            clone_url: url,
-            branch: branch.to_string()
-        })
+
+        match CloneUrl::new_from_url(url) {
+            Some(clone_url) => {
+                Ok(PushNotification {
+                    clone_url: clone_url,
+                    branch: branch.to_string()
+                })
+            },
+            None => Err("URL is not a clone URL")
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     extern crate serialize;
-    extern crate url;
+
     use self::serialize::json::Json;
     use self::serialize::json;
-    use self::url::Url;
 
     use super::{ToNotification, PushNotification};
+    use clone_url::CloneUrl;
 
     fn as_json(s: &str) -> Json {
       json::from_str(s).unwrap()
@@ -63,11 +70,11 @@ mod tests {
             as_json("{\"ref\": \"refs/heads/gh-pages\", \"repository\":\
                     { \"clone_url\": \
                     \"https://github.com/baxterthehacker/public-repo.git\" } }");
-        let url = Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap();
         assert_eq!(
             valid.to_push_notification(),
             Ok(PushNotification {
-                clone_url: url,
+                clone_url: CloneUrl::new_from_str(
+                    "https://github.com/baxterthehacker/public-repo.git").unwrap(),
                 branch: "gh-pages".to_string()
             }));
     }

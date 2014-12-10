@@ -156,7 +156,7 @@ pub mod testing {
                 SendPush(ref push) => {
                     format!("{{ \"ref\": \"refs/head/{}\", \"repository\": {{ \"clone_url\": \"{}\" }} }}",
                             push.branch,
-                            push.clone_url.to_string())
+                            push.clone_url.url.to_string())
                 }
                 SendString(s) => s.to_string()
             }
@@ -171,11 +171,11 @@ mod tests {
 
     use std::sync::{RWLock, Arc};
     use self::hyper::{IpAddr, Ipv4Addr, Port};
-    use self::url::Url;
 
     use super::{NotificationReceiver, NotificationListener};
 
     use notification::PushNotification;
+    use clone_url::CloneUrl;
     use super::testing::{send_to_server, Sendable};
     use super::testing::Sendable::{SendPush, SendString};
 
@@ -199,7 +199,6 @@ mod tests {
         fn receive_push_notification(&self, not: PushNotification) {
             let mut lock = self.pushes.write();
             lock.push(not);
-            lock.downgrade();
         }
     }
 
@@ -247,7 +246,8 @@ mod tests {
     fn server_gets_valid_push_1() {
         let p1 =
             &SendPush(PushNotification {
-                clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
+                clone_url: CloneUrl::new_from_str(
+                    "https://github.com/baxterthehacker/public-repo.git").unwrap(),
                 branch: "master".to_string()
             });
         send_multi_to_server(1235u16, &vec!(p1));
@@ -257,12 +257,14 @@ mod tests {
     fn server_gets_valid_push_2() {
         let p1 =
             &SendPush(PushNotification {
-                clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
+                clone_url: CloneUrl::new_from_str(
+                    "https://github.com/baxterthehacker/public-repo.git").unwrap(),
                 branch: "master".to_string()
             });
         let p2 =
             &SendPush(PushNotification {
-                clone_url: Url::parse("https://github.com/blahdeblah/coolbeans.git").unwrap(),
+                clone_url: CloneUrl::new_from_str(
+                    "https://github.com/blahdeblah/coolbeans.git").unwrap(),
                 branch: "experimental".to_string()
             });
         send_multi_to_server(1236u16, &vec!(p1, p2));
@@ -278,12 +280,14 @@ mod tests {
     fn server_gets_invalid_valid() {
         let v1 =
             &SendPush(PushNotification {
-                clone_url: Url::parse("https://github.com/baxterthehacker/public-repo.git").unwrap(),
+                clone_url: CloneUrl::new_from_str(
+                    "https://github.com/baxterthehacker/public-repo.git").unwrap(),
                 branch: "master".to_string()
             });
         let v2 =
             &SendPush(PushNotification {
-                clone_url: Url::parse("https://github.com/blahdeblah/coolbeans.git").unwrap(),
+                clone_url: CloneUrl::new_from_str(
+                    "https://github.com/blahdeblah/coolbeans.git").unwrap(),
                 branch: "experimental".to_string()
             });
         let s1 = &SendString("some string");
