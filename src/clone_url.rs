@@ -3,7 +3,7 @@ extern crate url;
 use self::url::Url;
 use self::url::SchemeData::Relative;
 
-#[deriving(Show, PartialEq)]
+#[deriving(Show, PartialEq, Clone)]
 pub struct CloneUrl {
     pub url: Url,
     username: String,
